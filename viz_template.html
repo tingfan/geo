@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terrain Point Cloud</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: monospace;
+            pointer-events: none;
+        }
+
+        #controls {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            z-index: 100;
+        }
+
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button.active {
+            background: #006600;
+            border-color: #00ff00;
+        }
+
+        #coords {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border: 1px solid #444;
+            pointer-events: none;
+        }
+    </style>
+    <!-- Import maps polyfill -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        .label {
+            color: #FFF;
+            font-family: sans-serif;
+            padding: 2px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+    <style>
+        .label {
+            color: #FFF;
+            font-family: sans-serif;
+            padding: 2px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        #loadingOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-family: monospace;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loadingOverlay">
+        <div class="loader"></div>
+        <div id="loadingText">Loading... 0%</div>
+    </div>
+    <div id="info">Terrain Point Cloud Visualization<br>Left Click: Pan | Right Click: Rotate | Scroll: Zoom</div>
+    <div id="controls">
+        <button id="selectStartBtn">Select Start Point</button>
+        <button id="selectEndBtn">Select End Point</button>
+    </div>
+    <div id="coords">
+        Start: <span id="startCoord">Not selected</span><br>
+        End: <span id="endCoord">Not selected</span>
+    </div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        let camera, scene, renderer, labelRenderer, controls;
+        let raycaster, pointer;
+        let selectionMode = 'none'; // 'none', 'start', 'end'
+        let pointsMesh;
+        let arrowHelperStart, arrowHelperEnd;
+
+        init();
+
+        async function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.up.set(0, 0, 1); // Set Z as up
+            // Initial camera position - will be adjusted based on data bounds
+            camera.position.set(0, 0, 500);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            labelRenderer = new CSS2DRenderer();
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.domElement.style.position = 'absolute';
+            labelRenderer.domElement.style.top = '0px';
+            labelRenderer.domElement.style.pointerEvents = 'none'; // Let clicks pass through
+            document.body.appendChild(labelRenderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Map-style controls: Left Click to Pan, Right Click to Rotate
+            controls.mouseButtons = {
+                LEFT: THREE.MOUSE.PAN,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.ROTATE
+            };
+
+            // Raycaster setup
+            raycaster = new THREE.Raycaster();
+            // Adjust threshold for point selection
+            raycaster.params.Points.threshold = 0.5;
+            pointer = new THREE.Vector2();
+
+            // Event Listeners
+            document.getElementById('selectStartBtn').addEventListener('click', () => toggleSelectionMode('start'));
+            document.getElementById('selectEndBtn').addEventListener('click', () => toggleSelectionMode('end'));
+            window.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('resize', onWindowResize);
+
+            // Load Data
+            try {
+                await loadData();
+                animate();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loadingText').textContent = "Error loading data: " + e.message;
+            }
+        }
+
+        async function loadData() {
+            const loadingText = document.getElementById('loadingText');
+
+            // Load points
+            loadingText.textContent = "Loading Points... 0%";
+            const points = await loadBinary('points.bin', (p) => {
+                loadingText.textContent = `Loading Points... ${Math.round(p)}%`;
+            });
+
+            // Load colors
+            loadingText.textContent = "Loading Colors... 0%";
+            const colors = await loadBinary('colors.bin', (p) => {
+                loadingText.textContent = `Loading Colors... ${Math.round(p)}%`;
+            });
+
+            loadingText.textContent = "Processing...";
+            createPointCloud(points, colors);
+
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function loadBinary(url, onProgress) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = 'arraybuffer';
+
+                xhr.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const percent = (event.loaded / event.total) * 100;
+                        onProgress(percent);
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        resolve(new Float32Array(xhr.response));
+                    } else {
+                        reject(new Error(`Failed to load ${url}: ${xhr.statusText}`));
+                    }
+                };
+
+                xhr.onerror = () => reject(new Error("Network Error"));
+                xhr.send();
+            });
+        }
+
+        function createPointCloud(positions, colors) {
+            if (positions.length > 0) {
+                const geometry = new THREE.BufferGeometry();
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                // Center the geometry
+                geometry.computeBoundingBox();
+                const center = new THREE.Vector3();
+                geometry.boundingBox.getCenter(center);
+                geometry.center();
+                geometry.computeBoundingBox();
+
+                const material = new THREE.PointsMaterial({
+                    size: 0.1,
+                    vertexColors: true,
+                    sizeAttenuation: true
+                });
+
+                const points = new THREE.Points(geometry, material);
+                pointsMesh = points; // Save reference for raycasting
+                scene.add(points);
+
+                // Adjust camera to fit
+                const size = new THREE.Vector3();
+                geometry.boundingBox.getSize(size);
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+
+                // Fit width
+                let cameraZ = Math.abs(size.x / (2 * Math.tan(fov / 2) * camera.aspect));
+                cameraZ *= 0.8; // Zoom in a bit more (was 1.2 padding)
+
+                // Position camera for a nice isometric view
+                camera.position.set(0, -cameraZ, cameraZ * 0.8);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+            } else {
+                console.error("No points data found!");
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function toggleSelectionMode(mode) {
+            const startBtn = document.getElementById('selectStartBtn');
+            const endBtn = document.getElementById('selectEndBtn');
+
+            if (selectionMode === mode) {
+                // Toggle off
+                selectionMode = 'none';
+                startBtn.classList.remove('active');
+                endBtn.classList.remove('active');
+                startBtn.textContent = "Select Start Point";
+                endBtn.textContent = "Select End Point";
+                document.body.style.cursor = 'default';
+            } else {
+                // Switch mode
+                selectionMode = mode;
+                startBtn.classList.remove('active');
+                endBtn.classList.remove('active');
+
+                if (mode === 'start') {
+                    startBtn.classList.add('active');
+                    startBtn.textContent = "Click on point...";
+                    endBtn.textContent = "Select End Point";
+                } else {
+                    endBtn.classList.add('active');
+                    endBtn.textContent = "Click on point...";
+                    startBtn.textContent = "Select Start Point";
+                }
+                document.body.style.cursor = 'crosshair';
+            }
+        }
+
+        function onPointerDown(event) {
+            if (selectionMode === 'none') return;
+
+            // Ignore clicks on UI
+            if (event.target.tagName === 'BUTTON') return;
+
+            // Calculate pointer position in normalized device coordinates
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+
+            const intersects = raycaster.intersectObject(pointsMesh);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+                const point = intersect.point;
+                console.log("Selected point:", point);
+
+                if (selectionMode === 'start') {
+                    addArrow(point, 'start');
+                    document.getElementById('startCoord').textContent = `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)}`;
+                } else {
+                    addArrow(point, 'end');
+                    document.getElementById('endCoord').textContent = `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)}`;
+                }
+
+                // Turn off selection mode after selection
+                toggleSelectionMode(selectionMode);
+            }
+        }
+
+        function addArrow(position, type) {
+            const group = new THREE.Group();
+
+            // Arrow dimensions - Thicker and more visible
+            const shaftRadius = 1.0;
+            const shaftLength = 10.0;
+            const headRadius = 2.5;
+            const headLength = 5.0;
+
+            let color;
+            if (type === 'start') {
+                if (arrowHelperStart) scene.remove(arrowHelperStart);
+                color = 0xffff00; // Yellow for start
+            } else {
+                if (arrowHelperEnd) scene.remove(arrowHelperEnd);
+                color = 0xff00ff; // Magenta for end
+            }
+
+            const material = new THREE.MeshPhongMaterial({
+                color: color,
+                shininess: 100
+            });
+
+            // 1. Head (Cone)
+            // We want the Tip at (0,0,0) and Base at (0, headLength, 0).
+            // Standard Cone: Center at 0. Tip at +H/2. Base at -H/2.
+            // Rotate 180 deg (PI) so Tip is at -H/2.
+            // Then translate up by H/2 so Tip is at 0.
+            const headGeometry = new THREE.ConeGeometry(headRadius, headLength, 32);
+            const head = new THREE.Mesh(headGeometry, material);
+            head.rotation.x = Math.PI;
+            head.position.y = headLength / 2;
+            group.add(head);
+
+            // 2. Shaft (Cylinder)
+            // We want it sitting on the Base of the head.
+            // So from y = headLength to y = headLength + shaftLength.
+            // Center is at y = headLength + shaftLength / 2.
+            const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 32);
+            const shaft = new THREE.Mesh(shaftGeometry, material);
+            shaft.position.y = headLength + shaftLength / 2;
+            group.add(shaft);
+
+            // 3. Orient the arrow
+            // Currently constructed along +Y axis (Tip at 0, Tail up).
+            // This effectively points -Y (towards origin).
+            // We want it to point -Z (Down).
+            // Rotate X by +90 deg (PI/2) maps -Y to -Z.
+            // (0, -1, 0) -> (0, 0, -1).
+            group.rotation.x = Math.PI / 2;
+
+            // 4. Position at target
+            group.position.copy(position);
+
+            // Add light for the 3D shape if not present
+            if (!scene.getObjectByName("arrowLight")) {
+                const light = new THREE.DirectionalLight(0xffffff, 1.5);
+                light.position.set(50, 50, 100);
+                light.name = "arrowLight";
+                scene.add(light);
+                scene.add(new THREE.AmbientLight(0x606060));
+            }
+
+            // 5. Add Label
+            const div = document.createElement('div');
+            div.className = 'label';
+            div.textContent = type === 'start' ? 'Start' : 'End';
+            div.style.color = type === 'start' ? '#ffff00' : '#ff00ff';
+
+            const label = new CSS2DObject(div);
+            // Position label above the shaft
+            label.position.set(0, headLength + shaftLength + 2, 0);
+            group.add(label);
+
+            scene.add(group);
+
+            if (type === 'start') {
+                arrowHelperStart = group;
+            } else {
+                arrowHelperEnd = group;
+            }
+
+            console.log(`${type} arrow added at`, position);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+    </script>
+</body>
+
+</html>
