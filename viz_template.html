@@ -143,6 +143,7 @@
         <button id="selectEndBtn">Select End Point</button>
     </div>
     <div id="coords">
+        Hover: <span id="hoverCoord">-</span><br>
         Start: <span id="startCoord">Not selected</span><br>
         End: <span id="endCoord">Not selected</span>
     </div>
@@ -201,6 +202,7 @@
             document.getElementById('selectStartBtn').addEventListener('click', () => toggleSelectionMode('start'));
             document.getElementById('selectEndBtn').addEventListener('click', () => toggleSelectionMode('end'));
             window.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('pointermove', onPointerMove);
             window.addEventListener('resize', onWindowResize);
 
             // Load Data
@@ -273,11 +275,7 @@
                 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-                // Center the geometry
-                geometry.computeBoundingBox();
-                const center = new THREE.Vector3();
-                geometry.boundingBox.getCenter(center);
-                geometry.center();
+                // Don't center - keep absolute coordinates from GeoTIFF
                 geometry.computeBoundingBox();
 
                 const material = new THREE.PointsMaterial({
@@ -290,9 +288,13 @@
                 pointsMesh = points; // Save reference for raycasting
                 scene.add(points);
 
-                // Adjust camera to fit
+                // Adjust camera to fit and look at center
                 const size = new THREE.Vector3();
                 geometry.boundingBox.getSize(size);
+
+                // Get the center of the point cloud
+                const center = new THREE.Vector3();
+                geometry.boundingBox.getCenter(center);
 
                 const maxDim = Math.max(size.x, size.y, size.z);
                 const fov = camera.fov * (Math.PI / 180);
@@ -301,10 +303,10 @@
                 let cameraZ = Math.abs(size.x / (2 * Math.tan(fov / 2) * camera.aspect));
                 cameraZ *= 0.8; // Zoom in a bit more (was 1.2 padding)
 
-                // Position camera for a nice isometric view
-                camera.position.set(0, -cameraZ, cameraZ * 0.8);
-                camera.lookAt(0, 0, 0);
-                controls.target.set(0, 0, 0);
+                // Position camera for a nice isometric view, relative to center
+                camera.position.set(center.x, center.y - cameraZ, center.z + cameraZ * 0.8);
+                camera.lookAt(center);
+                controls.target.copy(center);
             } else {
                 console.error("No points data found!");
             }
@@ -379,6 +381,34 @@
                 toggleSelectionMode(selectionMode);
             }
         }
+
+        function onPointerMove(event) {
+            // Don't raycast if we don't have a point cloud yet
+            if (!pointsMesh) return;
+
+            // Ignore hover on UI elements
+            if (event.target.tagName === 'BUTTON') {
+                document.getElementById('hoverCoord').textContent = '-';
+                return;
+            }
+
+            // Calculate pointer position in normalized device coordinates
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+
+            const intersects = raycaster.intersectObject(pointsMesh);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+                const point = intersect.point;
+                document.getElementById('hoverCoord').textContent = `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)}`;
+            } else {
+                document.getElementById('hoverCoord').textContent = '-';
+            }
+        }
+
 
         function addArrow(position, type) {
             const group = new THREE.Group();
