@@ -78,7 +78,7 @@
             background: rgba(0, 0, 0, 0.6);
             border-radius: 4px;
             pointer-events: none;
-            font-size: 12px;
+            font-size: 18px;
             font-weight: bold;
         }
     </style>
@@ -90,7 +90,7 @@
             background: rgba(0, 0, 0, 0.6);
             border-radius: 4px;
             pointer-events: none;
-            font-size: 12px;
+            font-size: 18px;
             font-weight: bold;
         }
 
@@ -229,7 +229,13 @@
             });
 
             loadingText.textContent = "Processing...";
-            createPointCloud(points, colors);
+            createPointCloud(points, colors, 0.1);
+
+            const path_points = await loadBinary('path_points.bin', (p) => { })
+            const path_colors = await loadBinary('path_colors.bin', (p) => { })
+            console.log('colors', path_colors)
+            console.log('points', path_points)
+            // createPointCloud(path_points, path_colors, 0.5)
 
             document.getElementById('loadingOverlay').style.display = 'none';
         }
@@ -260,7 +266,7 @@
             });
         }
 
-        function createPointCloud(positions, colors) {
+        function createPointCloud(positions, colors, point_size) {
             if (positions.length > 0) {
                 const geometry = new THREE.BufferGeometry();
 
@@ -275,7 +281,7 @@
                 geometry.computeBoundingBox();
 
                 const material = new THREE.PointsMaterial({
-                    size: 0.1,
+                    size: point_size,
                     vertexColors: true,
                     sizeAttenuation: true
                 });
@@ -385,10 +391,24 @@
 
             let color;
             if (type === 'start') {
-                if (arrowHelperStart) scene.remove(arrowHelperStart);
+                if (arrowHelperStart) {
+                    // Remove the label from DOM before removing the arrow
+                    const oldLabel = arrowHelperStart.children.find(child => child instanceof CSS2DObject);
+                    if (oldLabel && oldLabel.element.parentNode) {
+                        oldLabel.element.parentNode.removeChild(oldLabel.element);
+                    }
+                    scene.remove(arrowHelperStart);
+                }
                 color = 0xffff00; // Yellow for start
             } else {
-                if (arrowHelperEnd) scene.remove(arrowHelperEnd);
+                if (arrowHelperEnd) {
+                    // Remove the label from DOM before removing the arrow
+                    const oldLabel = arrowHelperEnd.children.find(child => child instanceof CSS2DObject);
+                    if (oldLabel && oldLabel.element.parentNode) {
+                        oldLabel.element.parentNode.removeChild(oldLabel.element);
+                    }
+                    scene.remove(arrowHelperEnd);
+                }
                 color = 0xff00ff; // Magenta for end
             }
 

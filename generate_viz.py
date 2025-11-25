@@ -71,6 +71,14 @@ def generate_visualization(input_tif, output_html, subsample_skip=5):
     print(f"Saving binary data to {points_bin_path} and {colors_bin_path}...")
     points.astype(np.float32).tofile(points_bin_path)
     rgb.astype(np.float32).tofile(colors_bin_path)
+
+    # write path
+    path_points = np.zeros((10,3), np.float32)
+    path_points[0]= [6.9964438e+05, 4.0342012e+06, 6.5988776e+02]
+    path_rgb = np.ones((10,3), np.uint8) * 255
+    path_points.astype(np.float32).tofile(os.path.join(output_dir, 'path_points.bin'))
+    path_rgb.astype(np.float32).tofile(os.path.join(output_dir, 'path_colors.bin'))
+ 
     
     # Read template
     with open('viz_template.html', 'r') as f:
