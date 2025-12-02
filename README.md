@@ -32,14 +32,19 @@ flowchart LR
         * cost - step + weight * height difference, tradeoff between 2d-distance and height difference
 
 ## Setup
+Install pixi. [pixi installation detail](https://pixi.sh/latest/installation/)
+```
+curl -fsSL https://pixi.sh/install.sh | sh
+```
+Install ths repo
 ```
 git clone git@github.com:tingfan/geo.git
 cd geo
 [optionally] download msn-GD7KCzDIxA_VEGETATION_DEM.tif into data folder.
-pixi run test_all.py 
-python -m http.server
+pixi run python test_all.py 
+pixi run python -m http.server
 ```
-Open browser and navigate to http://localhost:8000
+Open browser and navigate to http://localhost:8000/viz.html
 An online version (test data only) can be found at https://tingfan.github.io/geo/viz.html
 
 
