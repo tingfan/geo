@@ -23,10 +23,10 @@ def generate_mock_terrain(width_m, height_m, resolution, output_file):
     
     # Generate 10 random control points
     # x in [0, width_m], y in [0, height_m]
-    n_points = 10
+    n_points = 20
     control_x = np.random.uniform(0, width_m, n_points)
     control_y = np.random.uniform(0, height_m, n_points)
-    control_z = np.random.uniform(10, 20, n_points)
+    control_z = np.random.uniform(10, 15, n_points)
     
     print("Control points:")
     for i in range(n_points):
@@ -112,9 +112,9 @@ def generate_mock_terrain(width_m, height_m, resolution, output_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a mockup GeoTIFF terrain.")
-    parser.add_argument("--width", type=float, default=100.0, help="Width in meters (default: 100)")
-    parser.add_argument("--height", type=float, default=100.0, help="Height in meters (default: 100)")
-    parser.add_argument("--resolution", type=float, default=0.01, help="Resolution in meters/pixel (default: 0.01)")
+    parser.add_argument("--width", type=float, default=50.0, help="Width in meters (default: 10)")
+    parser.add_argument("--height", type=float, default=30.0, help="Height in meters (default: 10)")
+    parser.add_argument("--resolution", type=float, default=0.1, help="Resolution in meters/pixel (default: 0.01)")
     parser.add_argument("--output", type=str, default="data/mock_terrain.tif", help="Output filename")
     
     args = parser.parse_args()

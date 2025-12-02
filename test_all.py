@@ -47,8 +47,8 @@ def process_all_files(data_dir="data", output_base="output"):
                     sys.executable, "generate_path.py",
                     "--input", tif_path,
                     "--output-dir", output_dir,
-                    "--start", "10", "10",
-                    "--end", "50", "50"
+                    "--start", "10", "20",
+                    "--end", "40", "15"
                 ]
                 print(' '.join(path_cmd))
                 try:
