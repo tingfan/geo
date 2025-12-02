@@ -1,19 +1,22 @@
+# Robot 2.5D/3D Path Search
+![Viz](assets/viz.jpg)
 
-# Design Decisions
+
+## Design Decisions
 * Use [pixi](https://github.com/tingfan/pixi) to manage python packages, this build on conda save the resolved packages in a lock file so which increase reproductibility and speed.
 * Use [d3](https://github.com/d3/d3) as a light-weight html only visualizer. I've tried rerun, but found it diffiult to create flexible user-interface and slower rendering speed for large scale point cloud
 * Independent python CLIs that can be used indepedently from the web visualizer
 
-# Algorithm
+## Algorithm
 1. 2D Voxelization
     * Use median filter to remove depth noise
     * Save a voxel grid as a numpy array
-2. 2D short-test path search algorithm
+1. 2D short-test path search algorithm
     * Use Dijkstra's algorithm to find the shortest path. 
         * 4-connectivity + neighbor voxel with in given height difference limit (cosider robot step height)
         * cost - step + weight * height difference, tradeoff between 2d-distance and height difference
 
-# Setup
+## Setup
 ```
 git clone git@github.com:tingfan/geo.git
 cd geo
