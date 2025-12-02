@@ -1,5 +1,6 @@
 # Robot 2.5D/3D Path Search
 ![Viz](assets/viz.jpg)
+[Demo website](https://tingfan.github.io/geo/viz.html)
 
 
 ## Design Decisions
