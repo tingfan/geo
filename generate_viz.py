@@ -4,7 +4,7 @@ import matplotlib.colors as mcolors
 import json
 import os
 
-def generate_visualization(input_tif, output_html, subsample_skip=5):
+def generate_visualization(input_tif, output_dir='output', subsample_skip=5):
     print(f"Reading {input_tif}...")
     
     with rasterio.open(input_tif) as src:
@@ -64,7 +64,6 @@ def generate_visualization(input_tif, output_html, subsample_skip=5):
     rgb = mcolors.hsv_to_rgb(hsv)
     
     # Export binary data
-    output_dir = os.path.dirname(os.path.abspath(output_html))
     points_bin_path = os.path.join(output_dir, 'points.bin')
     colors_bin_path = os.path.join(output_dir, 'colors.bin')
     
@@ -75,31 +74,13 @@ def generate_visualization(input_tif, output_html, subsample_skip=5):
     # write path
     path_points = np.zeros((10,3), np.float32)
     path_points[0]= [6.9964438e+05, 4.0342012e+06, 6.5988776e+02]
-    path_rgb = np.ones((10,3), np.uint8) * 255
     path_points.astype(np.float32).tofile(os.path.join(output_dir, 'path_points.bin'))
-    path_rgb.astype(np.float32).tofile(os.path.join(output_dir, 'path_colors.bin'))
- 
-    
-    # Read template
-    with open('viz_template.html', 'r') as f:
-        template = f.read()
-        
-    # Write HTML (no injection needed)
-    print("Generating HTML...")
-    # We just write the template as is, the JS will load the bin files
-    # We might want to ensure the template doesn't have the placeholders anymore or they are ignored
-    # The new template won't have them.
-    
-    with open(output_html, 'w') as f:
-        f.write(template)
-        
-    print(f"Visualization saved to {output_html}")
+    print(f"Binary data saved. Open viz.html in a browser to view.")
 
 if __name__ == "__main__":
     input_file = "data/msn-GD7KCzDIxA_VEGETATION_DEM.tif"
-    output_file = "output/terrain_viz.html"
     
     if not os.path.exists(input_file):
         print(f"Error: {input_file} not found.")
     else:
-        generate_visualization(input_file, output_file)
+        generate_visualization(input_file)

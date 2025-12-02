@@ -6,3 +6,5 @@ output/
 data/
 
 **/**.sw*
+.DS_Store
+**/*.pyc

@@ -47,6 +47,33 @@
             border-color: #00ff00;
         }
 
+        #pathControls {
+            position: absolute;
+            top: 100px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #666;
+            color: white;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+
+        #pathControls.visible {
+            display: block;
+        }
+
+        #pathControls label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        #pathControls input[type="range"] {
+            width: 200px;
+            margin-left: 10px;
+        }
+
         #coords {
             position: absolute;
             bottom: 10px;
@@ -57,6 +84,52 @@
             padding: 10px;
             border: 1px solid #444;
             pointer-events: none;
+        }
+
+        #commandBox {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            max-width: 600px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #00ff00;
+            display: none;
+        }
+
+        #commandBox.visible {
+            display: block;
+        }
+
+        #commandText {
+            user-select: all;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px;
+            border-radius: 3px;
+            margin-top: 5px;
+            cursor: text;
+            word-wrap: break-word;
+        }
+
+        #copyBtn {
+            margin-top: 5px;
+            background: #00ff00;
+            color: black;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: monospace;
+            border-radius: 3px;
+        }
+
+        #copyBtn:hover {
+            background: #00cc00;
+        }
+
+        #copyBtn.copied {
+            background: #ffaa00;
         }
     </style>
     <!-- Import maps polyfill -->
@@ -70,18 +143,6 @@
             }
         }
     </script>
-    <style>
-        .label {
-            color: #FFF;
-            font-family: sans-serif;
-            padding: 2px;
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 4px;
-            pointer-events: none;
-            font-size: 18px;
-            font-weight: bold;
-        }
-    </style>
     <style>
         .label {
             color: #FFF;
@@ -137,15 +198,27 @@
         <div class="loader"></div>
         <div id="loadingText">Loading... 0%</div>
     </div>
-    <div id="info">Terrain Point Cloud Visualization<br>Left Click: Pan | Right Click: Rotate | Scroll: Zoom</div>
+    <div id="info">Terrain Point Cloud Visualization<br>Left Click: Pan | Right Click: Rotate | Scroll: Zoom | Double
+        Click: Recenter</div>
     <div id="controls">
         <button id="selectStartBtn">Select Start Point</button>
         <button id="selectEndBtn">Select End Point</button>
+    </div>
+    <div id="pathControls">
+        <label>
+            Path Width: <span id="linewidthValue">0.5</span>m
+            <input type="range" id="linewidthSlider" min="0.05" max="2.0" step="0.05" value="0.5">
+        </label>
     </div>
     <div id="coords">
         Hover: <span id="hoverCoord">-</span><br>
         Start: <span id="startCoord">Not selected</span><br>
         End: <span id="endCoord">Not selected</span>
+    </div>
+    <div id="commandBox">
+        <div>Copy this command to generate path:</div>
+        <div id="commandText"></div>
+        <button id="copyBtn">Copy to Clipboard</button>
     </div>
     <script type="module">
         import * as THREE from 'three';
@@ -157,6 +230,10 @@
         let selectionMode = 'none'; // 'none', 'start', 'end'
         let pointsMesh;
         let arrowHelperStart, arrowHelperEnd;
+        let startCoords = null;
+        let endCoords = null;
+        let pathTube = null; // Store reference to path tube
+        let pathPoints = null; // Store path points for regeneration
 
         init();
 
@@ -182,7 +259,7 @@
             document.body.appendChild(labelRenderer.domElement);
 
             controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
+            controls.enableDamping = false;
             controls.dampingFactor = 0.05;
 
             // Map-style controls: Left Click to Pan, Right Click to Rotate
@@ -201,8 +278,11 @@
             // Event Listeners
             document.getElementById('selectStartBtn').addEventListener('click', () => toggleSelectionMode('start'));
             document.getElementById('selectEndBtn').addEventListener('click', () => toggleSelectionMode('end'));
+            document.getElementById('copyBtn').addEventListener('click', copyCommandToClipboard);
+            document.getElementById('linewidthSlider').addEventListener('input', onLinewidthChange);
             window.addEventListener('pointerdown', onPointerDown);
             window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('dblclick', onDoubleClick);
             window.addEventListener('resize', onWindowResize);
 
             // Load Data
@@ -233,11 +313,49 @@
             loadingText.textContent = "Processing...";
             createPointCloud(points, colors, 0.1);
 
-            const path_points = await loadBinary('path_points.bin', (p) => { })
-            const path_colors = await loadBinary('path_colors.bin', (p) => { })
-            console.log('colors', path_colors)
-            console.log('points', path_points)
-            // createPointCloud(path_points, path_colors, 0.5)
+            // Try to load path if it exists
+            try {
+                loadingText.textContent = "Loading Path...";
+                const path_points = await loadBinary('output/path_points.bin', (p) => { });
+                if (path_points && path_points.length > 0) {
+                    console.log('Loaded path with', path_points.length / 3, 'points');
+                    pathPoints = path_points; // Store for regeneration
+                    createPathLine(path_points);
+
+                    // Show path controls
+                    document.getElementById('pathControls').classList.add('visible');
+
+                    // Add arrows at start and end of path
+                    const numPoints = path_points.length / 3;
+                    const startPoint = new THREE.Vector3(
+                        path_points[0],
+                        path_points[1],
+                        path_points[2]
+                    );
+                    const endPoint = new THREE.Vector3(
+                        path_points[(numPoints - 1) * 3],
+                        path_points[(numPoints - 1) * 3 + 1],
+                        path_points[(numPoints - 1) * 3 + 2]
+                    );
+
+                    addArrow(startPoint, 'start');
+                    addArrow(endPoint, 'end');
+
+                    // Update coordinate displays and tracking variables
+                    startCoords = { x: startPoint.x, y: startPoint.y, z: startPoint.z };
+                    endCoords = { x: endPoint.x, y: endPoint.y, z: endPoint.z };
+
+                    document.getElementById('startCoord').textContent =
+                        `${startPoint.x.toFixed(2)}, ${startPoint.y.toFixed(2)}, ${startPoint.z.toFixed(2)}`;
+                    document.getElementById('endCoord').textContent =
+                        `${endPoint.x.toFixed(2)}, ${endPoint.y.toFixed(2)}, ${endPoint.z.toFixed(2)}`;
+
+                    // Update command display
+                    updateCommandDisplay();
+                }
+            } catch (error) {
+                console.log('No path file found or error loading path:', error.message);
+            }
 
             document.getElementById('loadingOverlay').style.display = 'none';
         }
@@ -312,6 +430,112 @@
             }
         }
 
+        function createPathLine(positions, tubeRadius = 0.5) {
+            if (positions.length < 6) {  // Need at least 2 points (6 floats)
+                console.log("Path too short to display");
+                return;
+            }
+
+            // Remove old path tube if it exists
+            if (pathTube) {
+                scene.remove(pathTube);
+                pathTube.geometry.dispose();
+                pathTube.material.dispose();
+                pathTube = null;
+            }
+
+            const numPoints = positions.length / 3;
+            console.log(`Creating path line with ${numPoints} points, radius ${tubeRadius}`);
+
+            // Create a curve from the path points
+            const points = [];
+            for (let i = 0; i < numPoints; i++) {
+                points.push(new THREE.Vector3(
+                    positions[i * 3],
+                    positions[i * 3 + 1],
+                    positions[i * 3 + 2] + 0.5  // Offset above terrain
+                ));
+            }
+
+            // Create a curve path
+            const curve = new THREE.CatmullRomCurve3(points);
+
+            // Create tube geometry along the curve
+            const tubeSegments = Math.min(numPoints * 2, 500);  // Segments along the curve
+            const radialSegments = 8;  // Segments around the tube
+            const closed = false;
+
+            const tubeGeometry = new THREE.TubeGeometry(
+                curve,
+                tubeSegments,
+                tubeRadius,
+                radialSegments,
+                closed
+            );
+
+            // Create vertex colors for gradient
+            const colors = [];
+            const vertexCount = tubeGeometry.attributes.position.count;
+
+            for (let i = 0; i < vertexCount; i++) {
+                // Calculate position along the tube (0 to 1)
+                const segmentIndex = Math.floor(i / (radialSegments + 1));
+                const t = segmentIndex / tubeSegments;
+
+                // Gradient from cyan (0,1,1) to magenta (1,0,1)
+                colors.push(t, 1 - t, 1);
+            }
+
+            tubeGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            // Create material with vertex colors
+            const material = new THREE.MeshBasicMaterial({
+                vertexColors: true,
+                side: THREE.DoubleSide
+            });
+
+            const tube = new THREE.Mesh(tubeGeometry, material);
+            pathTube = tube; // Store reference
+            scene.add(tube);
+
+            console.log("Path tube added to scene");
+        }
+
+        function onLinewidthChange(event) {
+            const value = parseFloat(event.target.value);
+            document.getElementById('linewidthValue').textContent = value.toFixed(2);
+
+            // Regenerate path with new radius
+            if (pathPoints) {
+                createPathLine(pathPoints, value);
+            }
+        }
+
+
+        function onDoubleClick(event) {
+            // Ignore clicks on UI
+            if (event.target.tagName === 'BUTTON') return;
+            if (!pointsMesh) return;
+
+            // Calculate pointer position
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+
+            const intersects = raycaster.intersectObject(pointsMesh);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+                const point = intersect.point;
+                console.log("Centering view on:", point);
+
+                // Update controls target to look at the point
+                controls.target.copy(point);
+                controls.update();
+            }
+        }
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -370,16 +594,68 @@
                 console.log("Selected point:", point);
 
                 if (selectionMode === 'start') {
+                    startCoords = { x: point.x, y: point.y, z: point.z };
                     addArrow(point, 'start');
                     document.getElementById('startCoord').textContent = `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)}`;
                 } else {
+                    endCoords = { x: point.x, y: point.y, z: point.z };
                     addArrow(point, 'end');
                     document.getElementById('endCoord').textContent = `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)}`;
                 }
 
+                // Update command display
+                updateCommandDisplay();
+
                 // Turn off selection mode after selection
                 toggleSelectionMode(selectionMode);
             }
+        }
+
+        function updateCommandDisplay() {
+            const commandBox = document.getElementById('commandBox');
+            const commandText = document.getElementById('commandText');
+
+            let cmd = 'pixi run python generate_path.py';
+            let hasArgs = false;
+
+            if (startCoords) {
+                cmd += ` --start ${startCoords.x.toFixed(2)} ${startCoords.y.toFixed(2)}`;
+                hasArgs = true;
+            }
+            if (endCoords) {
+                cmd += ` --end ${endCoords.x.toFixed(2)} ${endCoords.y.toFixed(2)}`;
+                hasArgs = true;
+            }
+
+            if (hasArgs) {
+                commandText.textContent = cmd;
+                commandBox.classList.add('visible');
+            } else {
+                commandBox.classList.remove('visible');
+            }
+        }
+
+        function copyCommandToClipboard() {
+            const commandText = document.getElementById('commandText').textContent;
+            const copyBtn = document.getElementById('copyBtn');
+
+            navigator.clipboard.writeText(commandText).then(() => {
+                // Show success feedback
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('copied');
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy to Clipboard';
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                copyBtn.textContent = 'Copy Failed';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy to Clipboard';
+                }, 2000);
+            });
         }
 
         function onPointerMove(event) {
