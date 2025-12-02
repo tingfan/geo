@@ -7,6 +7,20 @@
 * Use [d3](https://github.com/d3/d3) as a light-weight html only visualizer. I've tried rerun, but found it diffiult to create flexible user-interface and slower rendering speed for large scale point cloud
 * Independent python CLIs that can be used indepedently from the web visualizer
 
+## Deliverables
+```mermaid
+---
+config:
+  look: handDrawn
+  theme: neutral
+---
+flowchart LR
+  I[GeoTiF real/mockmap] --> |generate_viz.py| C[MapCache point.bin/color.bin] --> V[viz.html]
+  I --> |generate_path.py|P[Path path_points.bin] --> V
+  G[generate_testmap.py] --> I
+  
+```
+
 ## Algorithm
 1. 2D Voxelization
     * Use median filter to remove depth noise
@@ -28,7 +42,7 @@ Open browser and navigate to http://localhost:8000
 An online version (test data only) can be found at https://tingfan.github.io/geo/viz.html
 
 
-# Tasks
+## Tasks
 - [X] Simple 2D path search for ground drone/robotdog navigation.
 - [ ] 2.5D path search for navigation above ground (allow drone flight with AGL or MSL fly rule or robot dog walking on reachable ground)
     - [X] 2D terrain map
