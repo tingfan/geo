@@ -71,16 +71,20 @@ def generate_visualization(input_tif, output_dir='output', subsample_skip=5):
     points.astype(np.float32).tofile(points_bin_path)
     rgb.astype(np.float32).tofile(colors_bin_path)
 
-    # write path
-    path_points = np.zeros((10,3), np.float32)
-    path_points[0]= [6.9964438e+05, 4.0342012e+06, 6.5988776e+02]
-    path_points.astype(np.float32).tofile(os.path.join(output_dir, 'path_points.bin'))
-    print(f"Binary data saved. Open viz.html in a browser to view.")
+
+import argparse
 
 if __name__ == "__main__":
-    input_file = "data/msn-GD7KCzDIxA_VEGETATION_DEM.tif"
+    parser = argparse.ArgumentParser(description="Generate 3D visualization data from GeoTIFF.")
+    parser.add_argument("--input", type=str, default="data/msn-GD7KCzDIxA_VEGETATION_DEM.tif", help="Input GeoTIFF file")
+    parser.add_argument("--output-dir", type=str, default="output", help="Output directory")
+    parser.add_argument("--subsample", type=int, default=5, help="Subsample skip factor (default: 5)")
     
-    if not os.path.exists(input_file):
-        print(f"Error: {input_file} not found.")
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.input):
+        print(f"Error: {args.input} not found.")
     else:
-        generate_visualization(input_file)
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir)
+        generate_visualization(args.input, args.output_dir, args.subsample)

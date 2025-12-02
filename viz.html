@@ -22,11 +22,61 @@
             pointer-events: none;
         }
 
+        /* 0. File Selector - bottom left */
+        #fileSelector {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 200px;
+            height: 75px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #444;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #fileDropdown {
+            width: 100%;
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 5px;
+            font-family: monospace;
+        }
+
+        /* 1. Coordinates box - next to file selector */
+        #coords {
+            position: absolute;
+            bottom: 10px;
+            left: 220px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #444;
+            pointer-events: none;
+            width: 420px;
+            height: 75px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* 2. Selection buttons - next to coordinates */
         #controls {
             position: absolute;
-            top: 50px;
-            left: 10px;
+            bottom: 10px;
+            left: 650px;
             z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            height: 75px;
+            justify-content: center;
         }
 
         button {
@@ -36,6 +86,7 @@
             padding: 8px 16px;
             cursor: pointer;
             font-family: monospace;
+            white-space: nowrap;
         }
 
         button:hover {
@@ -47,81 +98,63 @@
             border-color: #00ff00;
         }
 
-        #pathControls {
-            position: absolute;
-            top: 100px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border: 1px solid #666;
-            color: white;
-            font-family: monospace;
-            font-size: 12px;
-            display: none;
-        }
-
-        #pathControls.visible {
-            display: block;
-        }
-
-        #pathControls label {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        #pathControls input[type="range"] {
-            width: 200px;
-            margin-left: 10px;
-        }
-
-        #coords {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            color: white;
-            font-family: monospace;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border: 1px solid #444;
-            pointer-events: none;
-        }
-
+        /* 3. CLI command box - next to buttons */
         #commandBox {
             position: absolute;
             bottom: 10px;
-            right: 10px;
-            max-width: 600px;
+            left: 950px;
+            width: 400px;
+            height: 75px;
             color: white;
             font-family: monospace;
             background: rgba(0, 0, 0, 0.8);
             padding: 10px;
             border: 1px solid #00ff00;
             display: none;
+            box-sizing: border-box;
         }
 
         #commandBox.visible {
-            display: block;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #commandBox>div:first-child {
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        #commandContainer {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px;
+            border-radius: 3px;
         }
 
         #commandText {
             user-select: all;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 5px;
-            border-radius: 3px;
-            margin-top: 5px;
             cursor: text;
             word-wrap: break-word;
+            font-size: 11px;
+            flex: 1;
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
         }
 
         #copyBtn {
-            margin-top: 5px;
             background: #00ff00;
             color: black;
             border: none;
-            padding: 5px 10px;
+            padding: 4px 8px;
             cursor: pointer;
             font-family: monospace;
             border-radius: 3px;
+            font-size: 16px;
+            flex-shrink: 0;
         }
 
         #copyBtn:hover {
@@ -130,6 +163,39 @@
 
         #copyBtn.copied {
             background: #ffaa00;
+        }
+
+        /* 4. Path controls - next to CLI box */
+        #pathControls {
+            position: absolute;
+            bottom: 10px;
+            left: 1360px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #666;
+            color: white;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            width: 250px;
+            height: 75px;
+            box-sizing: border-box;
+        }
+
+        #pathControls.visible {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #pathControls label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        #pathControls input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
         }
     </style>
     <!-- Import maps polyfill -->
@@ -210,15 +276,22 @@
             <input type="range" id="linewidthSlider" min="0.05" max="2.0" step="0.05" value="0.5">
         </label>
     </div>
+    <div id="fileSelector">
+        <select id="fileDropdown">
+            <option value="" disabled selected>Select a file...</option>
+        </select>
+    </div>
     <div id="coords">
-        Hover: <span id="hoverCoord">-</span><br>
-        Start: <span id="startCoord">Not selected</span><br>
-        End: <span id="endCoord">Not selected</span>
+        <div>Hover: <span id="hoverCoord">-</span></div>
+        <div>Start: <span id="startCoord">Not selected</span></div>
+        <div>End: <span id="endCoord">Not selected</span></div>
     </div>
     <div id="commandBox">
         <div>Copy this command to generate path:</div>
-        <div id="commandText"></div>
-        <button id="copyBtn">Copy to Clipboard</button>
+        <div id="commandContainer">
+            <div id="commandText"></div>
+            <button id="copyBtn" title="Copy to clipboard">📋</button>
+        </div>
     </div>
     <script type="module">
         import * as THREE from 'three';
@@ -234,6 +307,8 @@
         let endCoords = null;
         let pathTube = null; // Store reference to path tube
         let pathPoints = null; // Store path points for regeneration
+        let selectedFile = null;
+        let fileMap = {}; // Store file info
 
         init();
 
@@ -285,28 +360,72 @@
             window.addEventListener('dblclick', onDoubleClick);
             window.addEventListener('resize', onWindowResize);
 
-            // Load Data
-            try {
-                await loadData();
-                animate();
-            } catch (e) {
-                console.error(e);
-                document.getElementById('loadingText').textContent = "Error loading data: " + e.message;
+            // Load File List
+            await loadFileSelector();
+
+            // Load initial data (first file if available)
+            if (document.getElementById('fileDropdown').options.length > 1) {
+                // Select first real option
+                document.getElementById('fileDropdown').selectedIndex = 1;
+                const firstFile = document.getElementById('fileDropdown').value;
+                onFileSelect({ target: { value: firstFile } });
             }
+
+            animate();
         }
 
-        async function loadData() {
+        async function loadData(basePath) {
             const loadingText = document.getElementById('loadingText');
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            // Clear existing scene
+            if (pointsMesh) {
+                scene.remove(pointsMesh);
+                pointsMesh.geometry.dispose();
+                pointsMesh.material.dispose();
+                pointsMesh = null;
+            }
+            if (pathTube) {
+                scene.remove(pathTube);
+                pathTube.geometry.dispose();
+                pathTube.material.dispose();
+                pathTube = null;
+            }
+            if (arrowHelperStart) {
+                const label = arrowHelperStart.children.find(child => child instanceof CSS2DObject);
+                if (label && label.element && label.element.parentNode) {
+                    label.element.parentNode.removeChild(label.element);
+                }
+                scene.remove(arrowHelperStart);
+                arrowHelperStart = null;
+            }
+            if (arrowHelperEnd) {
+                const label = arrowHelperEnd.children.find(child => child instanceof CSS2DObject);
+                if (label && label.element && label.element.parentNode) {
+                    label.element.parentNode.removeChild(label.element);
+                }
+                scene.remove(arrowHelperEnd);
+                arrowHelperEnd = null;
+            }
+
+            // Reset state
+            startCoords = null;
+            endCoords = null;
+            pathPoints = null;
+            document.getElementById('startCoord').textContent = "Not selected";
+            document.getElementById('endCoord').textContent = "Not selected";
+            document.getElementById('pathControls').classList.remove('visible');
+            updateCommandDisplay();
 
             // Load points
             loadingText.textContent = "Loading Points... 0%";
-            const points = await loadBinary('points.bin', (p) => {
+            const points = await loadBinary(`${basePath}/points.bin`, (p) => {
                 loadingText.textContent = `Loading Points... ${Math.round(p)}%`;
             });
 
             // Load colors
             loadingText.textContent = "Loading Colors... 0%";
-            const colors = await loadBinary('colors.bin', (p) => {
+            const colors = await loadBinary(`${basePath}/colors.bin`, (p) => {
                 loadingText.textContent = `Loading Colors... ${Math.round(p)}%`;
             });
 
@@ -316,7 +435,7 @@
             // Try to load path if it exists
             try {
                 loadingText.textContent = "Loading Path...";
-                const path_points = await loadBinary('output/path_points.bin', (p) => { });
+                const path_points = await loadBinary(`${basePath}/path_points.bin`, (p) => { });
                 if (path_points && path_points.length > 0) {
                     console.log('Loaded path with', path_points.length / 3, 'points');
                     pathPoints = path_points; // Store for regeneration
@@ -358,6 +477,50 @@
             }
 
             document.getElementById('loadingOverlay').style.display = 'none';
+
+            // Start animation loop if not already running
+            if (!renderer.info.autoClear) { // Hacky check if loop is running? No, let's just call animate once at init
+                // animate() is called in init() now? No, I removed it from init() above.
+                // Let's call animate() here if it's the first load.
+                // Actually, better to call animate() once in init() and let it loop.
+            }
+        }
+
+        async function loadFileSelector() {
+            try {
+                const response = await fetch('data/file_list.json');
+                const files = await response.json();
+                const dropdown = document.getElementById('fileDropdown');
+
+                files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file.name; // Use filename as value
+                    option.textContent = file.name;
+                    dropdown.appendChild(option);
+
+                    // Store info in map
+                    fileMap[file.name] = file;
+                });
+
+                dropdown.addEventListener('change', onFileSelect);
+            } catch (e) {
+                console.error("Error loading file list:", e);
+            }
+        }
+
+        function onFileSelect(event) {
+            selectedFile = event.target.value;
+            console.log("Selected file:", selectedFile);
+
+            const fileInfo = fileMap[selectedFile];
+            if (fileInfo) {
+                // Load data for this file
+                loadData(fileInfo.data_path).catch(e => {
+                    console.error(e);
+                    document.getElementById('loadingText').textContent = "Error loading data: " + e.message;
+                    document.getElementById('loadingOverlay').style.display = 'flex';
+                });
+            }
         }
 
         function loadBinary(url, onProgress) {
@@ -616,6 +779,18 @@
             const commandText = document.getElementById('commandText');
 
             let cmd = 'pixi run python generate_path.py';
+
+            if (selectedFile) {
+                // Assume input is in data/ directory
+                cmd += ` --input data/${selectedFile}`;
+
+                // Add output directory based on selected file
+                const fileInfo = fileMap[selectedFile];
+                if (fileInfo && fileInfo.data_path) {
+                    cmd += ` --output-dir ${fileInfo.data_path}`;
+                }
+            }
+
             let hasArgs = false;
 
             if (startCoords) {
@@ -627,7 +802,7 @@
                 hasArgs = true;
             }
 
-            if (hasArgs) {
+            if (hasArgs || selectedFile) {
                 commandText.textContent = cmd;
                 commandBox.classList.add('visible');
             } else {
@@ -641,19 +816,19 @@
 
             navigator.clipboard.writeText(commandText).then(() => {
                 // Show success feedback
-                copyBtn.textContent = 'Copied!';
+                copyBtn.textContent = '✓';
                 copyBtn.classList.add('copied');
 
                 // Reset after 2 seconds
                 setTimeout(() => {
-                    copyBtn.textContent = 'Copy to Clipboard';
+                    copyBtn.textContent = '📋';
                     copyBtn.classList.remove('copied');
                 }, 2000);
             }).catch(err => {
                 console.error('Failed to copy:', err);
-                copyBtn.textContent = 'Copy Failed';
+                copyBtn.textContent = '✗';
                 setTimeout(() => {
-                    copyBtn.textContent = 'Copy to Clipboard';
+                    copyBtn.textContent = '📋';
                 }, 2000);
             });
         }
